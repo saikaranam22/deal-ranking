@@ -107,6 +107,7 @@ export default function Sourcing() {
   const [hydrated, setHydrated] = useState(false);
   const [hoveredSource, setHoveredSource] = useState<number | null>(null);
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
+  const [rotationOffset, setRotationOffset] = useState(0);
   
   // Animation effect on load
   useEffect(() => {
@@ -142,6 +143,94 @@ export default function Sourcing() {
     if (trend > 0) return 'text-blue-400';
     if (trend > -5) return 'text-amber-400';
     return 'text-rose-400';
+  };
+
+  // Calculate pie chart segments
+  const calculatePieSegments = () => {
+    // Verify that percentages add up to 100%
+    const totalPercentage = DEAL_SOURCES.reduce((sum, source) => sum + source.percentage, 0);
+    
+    // Calculate starting angle for each segment
+    let currentAngle = 0;
+    return DEAL_SOURCES.map((source, index) => {
+      // Calculate exact angle based on percentage
+      const startAngle = currentAngle;
+      const angle = (source.percentage / 100) * 360;
+      currentAngle += angle;
+      const endAngle = currentAngle;
+      
+      return {
+        ...source,
+        startAngle,
+        endAngle,
+        midAngle: (startAngle + endAngle) / 2,
+        index
+      };
+    });
+  };
+
+  const pieSegments = calculatePieSegments();
+
+  // Rotate the selected segment to the top
+  useEffect(() => {
+    if (selectedSource !== null) {
+      const segment = pieSegments[selectedSource];
+      const midAngle = (segment.startAngle + segment.endAngle) / 2;
+      setRotationOffset(-midAngle + 90); // Rotate to put the segment at the top
+    } else {
+      // Smoothly animate back to default position
+      const timer = setTimeout(() => {
+        setRotationOffset(0);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedSource]);
+
+  // Determine if a label should be visible based on segment size and position
+  const shouldShowLabel = (segment: typeof pieSegments[0]) => {
+    // Only show labels for segments with percentage > 5%
+    if (segment.percentage <= 5) return false;
+    
+    // Don't show labels for segments that would overlap
+    const midAngle = segment.midAngle;
+    
+    // If a segment is selected, only show its label
+    if (selectedSource !== null) {
+      return segment.index === selectedSource;
+    }
+    
+    // If a segment is hovered, prioritize its label
+    if (hoveredSource !== null) {
+      return segment.index === hoveredSource;
+    }
+    
+    return true;
+  };
+
+  // Calculate label position to avoid overlaps
+  const getLabelPosition = (segment: typeof pieSegments[0], isActive: boolean) => {
+    const angleInRadians = (segment.midAngle * Math.PI) / 180;
+    
+    // Adjust distance based on segment size and activity
+    let labelDistance = 145; // Default distance
+    
+    // Push larger segments' labels further out
+    if (segment.percentage > 25) {
+      labelDistance = 160;
+    } else if (segment.percentage < 10) {
+      labelDistance = 135;
+    }
+    
+    // Push active segment labels even further out
+    if (isActive) {
+      labelDistance += 15;
+    }
+    
+    // Calculate position
+    const labelX = Math.cos(angleInRadians) * labelDistance;
+    const labelY = Math.sin(angleInRadians) * labelDistance;
+    
+    return { labelX, labelY };
   };
 
   return (
@@ -205,61 +294,84 @@ export default function Sourcing() {
 
         {/* Interactive Visualization Section */}
         <div className={`mb-16 transition-all duration-700 relative z-10 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`} style={{transitionDelay: '200ms'}}>
-          {/* Radial Visualization */}
           <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-            {/* Left side - Radial chart */}
-            <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center border border-gray-700">
+            {/* Left side - Pie chart */}
+            <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px] flex items-center justify-center">
+              {/* Interactive Pie Chart */}
+              <div 
+                className="relative w-[280px] h-[280px] md:w-[350px] md:h-[350px] transition-transform duration-500 ease-in-out"
+                style={{ transform: `rotate(${rotationOffset}deg)` }}
+              >
+                {pieSegments.map((segment, index) => {
+                  const isActive = hoveredSource === index || selectedSource === index;
+                  
+                  // Calculate the SVG path for the pie segment
+                  const startAngle = segment.startAngle * (Math.PI / 180);
+                  const endAngle = segment.endAngle * (Math.PI / 180);
+                  
+                  const x1 = Math.cos(startAngle) * 140;
+                  const y1 = Math.sin(startAngle) * 140;
+                  
+                  const x2 = Math.cos(endAngle) * 140;
+                  const y2 = Math.sin(endAngle) * 140;
+                  
+                  const largeArcFlag = segment.endAngle - segment.startAngle > 180 ? 1 : 0;
+                  
+                  // Path for the pie segment
+                  const pathData = `
+                    M 0 0
+                    L ${x1} ${y1}
+                    A 140 140 0 ${largeArcFlag} 1 ${x2} ${y2}
+                    Z
+                  `;
+                  
+                  return (
+                    <div key={index} className="absolute inset-0">
+                      <svg 
+                        viewBox="-150 -150 300 300" 
+                        className="w-full h-full absolute top-0 left-0 cursor-pointer transition-transform duration-300"
+                        style={{ transform: isActive ? 'scale(1.05)' : 'scale(1)' }}
+                        onMouseEnter={() => setHoveredSource(index)}
+                        onMouseLeave={() => setHoveredSource(null)}
+                        onClick={() => setSelectedSource(selectedSource === index ? null : index)}
+                      >
+                        <path
+                          d={pathData}
+                          fill={segment.color}
+                          stroke="#111827"
+                          strokeWidth="1"
+                          opacity={hoveredSource !== null && hoveredSource !== index && selectedSource === null ? 0.5 : 1}
+                          filter={isActive ? `url(#glow-${index})` : ''}
+                        />
+                        
+                        {/* Glow filter for active segments */}
+                        <defs>
+                          <filter id={`glow-${index}`} x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feFlood floodColor={segment.color} result="color" />
+                            <feComposite in="color" in2="blur" operator="in" result="glow" />
+                            <feMerge>
+                              <feMergeNode in="glow" />
+                              <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                          </filter>
+                        </defs>
+                      </svg>
+                    </div>
+                  );
+                })}
+                
+                {/* Center circle with total */}
+                <div 
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-gray-800/80 backdrop-blur-sm flex items-center justify-center border border-gray-700 z-10 transition-all duration-300"
+                  style={{ transform: `translate(-50%, -50%) rotate(${-rotationOffset}deg)` }}
+                >
                   <div className="text-center">
                     <div className="text-2xl font-bold text-white">{totalDeals}</div>
                     <div className="text-xs text-gray-400">Total Deals</div>
                   </div>
                 </div>
               </div>
-              
-              {/* Radial segments */}
-              {DEAL_SOURCES.map((source, index) => {
-                const angle = (index / DEAL_SOURCES.length) * 360;
-                const isActive = hoveredSource === index || selectedSource === index;
-                const scale = isActive ? 1.1 : 1;
-                const opacity = hoveredSource !== null && hoveredSource !== index && selectedSource === null ? 0.5 : 1;
-                
-                return (
-                  <div 
-                    key={index}
-                    className="absolute top-1/2 left-1/2 origin-left cursor-pointer transition-all duration-300"
-                    style={{
-                      transform: `rotate(${angle}deg) scaleX(${scale})`,
-                      opacity
-                    }}
-                    onMouseEnter={() => setHoveredSource(index)}
-                    onMouseLeave={() => setHoveredSource(null)}
-                    onClick={() => setSelectedSource(selectedSource === index ? null : index)}
-                  >
-                    <div 
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${150 * (source.percentage / 100) * 2.5}px`,
-                        backgroundColor: source.color,
-                        boxShadow: isActive ? `0 0 15px ${source.color}` : 'none'
-                      }}
-                    />
-                    
-                    {isActive && (
-                      <div 
-                        className="absolute left-full ml-2 px-2 py-1 rounded whitespace-nowrap text-xs text-white bg-gray-800/80 backdrop-blur-sm"
-                        style={{
-                          transform: `rotate(-${angle}deg)`,
-                          boxShadow: `0 0 10px rgba(0,0,0,0.5)`
-                        }}
-                      >
-                        {source.name}: {source.count} ({source.percentage}%)
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
             
             {/* Right side - Details panel */}
