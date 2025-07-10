@@ -41,12 +41,6 @@ export default function Navbar() {
           >
             Workflow
           </button>
-          <button 
-            onClick={() => scrollToSection('pricing')} 
-            className="text-[var(--foreground)]/80 hover:text-[var(--foreground)] transition-colors"
-          >
-            Pricing
-          </button>
           <Link href="/about" className="text-[var(--foreground)]/80 hover:text-[var(--foreground)] transition-colors">
             About
           </Link>
@@ -95,12 +89,6 @@ export default function Navbar() {
               className="block w-full text-left text-[var(--foreground)]/80 hover:text-[var(--foreground)] transition-colors"
             >
               Workflow
-            </button>
-            <button 
-              onClick={() => scrollToSection('pricing')}
-              className="block w-full text-left text-[var(--foreground)]/80 hover:text-[var(--foreground)] transition-colors"
-            >
-              Pricing
             </button>
             <Link href="/about" className="block text-[var(--foreground)]/80 hover:text-[var(--foreground)] transition-colors">
               About

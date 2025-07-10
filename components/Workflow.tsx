@@ -290,7 +290,8 @@ const Workflow = () => {
                       <Image 
                         src={step.icon} 
                         alt={step.title} 
-                        fill 
+                        width={32}
+                        height={32}
                         className={`transition-all duration-500 ${activeStep === index ? 'filter-none' : 'filter grayscale opacity-50'}`}
                       />
                     </div>
