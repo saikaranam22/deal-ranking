@@ -102,7 +102,7 @@ const SPARKLINE_DATA = generateSparklineData();
 
 export default function Sourcing() {
   const [isVisible, setIsVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('volume');
+
   const [animatedCount, setAnimatedCount] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const [hoveredSource, setHoveredSource] = useState<number | null>(null);
@@ -276,16 +276,9 @@ export default function Sourcing() {
             <div className="flex items-center space-x-2">
               <div className="flex">
                 <button 
-                  className={`px-4 py-2 rounded-l-md text-sm transition-all ${activeTab === 'volume' ? 'bg-blue-500/20 text-blue-400 border-b-2 border-blue-500' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'}`}
-                  onClick={() => setActiveTab('volume')}
+                  className="px-4 py-2 rounded-md text-sm bg-blue-500/20 text-blue-400 border-b-2 border-blue-500"
                 >
                   Volume
-                </button>
-                <button 
-                  className={`px-4 py-2 rounded-r-md text-sm transition-all ${activeTab === 'quality' ? 'bg-blue-500/20 text-blue-400 border-b-2 border-blue-500' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'}`}
-                  onClick={() => setActiveTab('quality')}
-                >
-                  Quality
                 </button>
               </div>
             </div>
@@ -420,13 +413,13 @@ export default function Sourcing() {
                             <div 
                               className="h-full rounded-full transition-all duration-500"
                               style={{ 
-                                width: isVisible ? `${activeTab === 'quality' ? source.quality : source.percentage}%` : '0%',
+                                width: isVisible ? `${source.percentage}%` : '0%',
                                 backgroundColor: source.color
                               }}
                             />
                           </div>
                           <span className="ml-2 text-xs text-gray-400">
-                            {activeTab === 'quality' ? `${source.quality}%` : `${source.percentage}%`}
+                            {source.percentage}%
                           </span>
                         </div>
                         

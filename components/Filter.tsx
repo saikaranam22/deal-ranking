@@ -11,6 +11,40 @@ const seedRandom = (seed: number) => {
   };
 };
 
+// Scoring weights used to compute totalScore in the Details modal
+const SCORING_WEIGHTS = {
+  linkedinStrength: 0.25,
+  exitStrategyStrength: 0.25,
+  gtmStrength: 0.25,
+  businessModelStrength: 0.25,
+};
+
+// Helper to create reasons per factor
+const generateReasons = (deal: any) => {
+  return {
+    linkedinStrength: deal.linkedinStrength >= 85
+      ? 'Strong founder/operator network with 3+ relevant intros and high engagement.'
+      : deal.linkedinStrength >= 70
+      ? 'Decent network presence; several warm intros likely.'
+      : 'Limited network strength; fewer warm paths to founders.',
+    exitStrategyStrength: deal.exitStrategyStrength >= 85
+      ? 'Clear exit path with multiple acquirer profiles and precedent transactions.'
+      : deal.exitStrategyStrength >= 70
+      ? 'Exit opportunities exist but require milestone validation.'
+      : 'Exit path unclear; requires strategy work with founders.',
+    gtmStrength: deal.gtmStrength >= 85
+      ? 'Efficient bottom‑up GTM with high conversion from POC to paid.'
+      : deal.gtmStrength >= 70
+      ? 'GTM channels identified; repeatability still being proven.'
+      : 'Early GTM validation; channel economics not yet demonstrated.',
+    businessModelStrength: deal.businessModelStrength >= 85
+      ? 'Compelling unit economics and gross margin profile for scale.'
+      : deal.businessModelStrength >= 70
+      ? 'Unit economics trending positively; margin expansion expected.'
+      : 'Unit economics unproven; material margin risk at scale.',
+  };
+};
+
 const generateDeals = () => {
   // Use a fixed seed for random generation to ensure server/client consistency
   const random = seedRandom(42);
@@ -31,31 +65,33 @@ const generateDeals = () => {
     'Network', 'Platform', 'AI', 'Analytics', 'Dynamics', 'Connect', 'Corp', 'Inc.'
   ];
   
-  const deals = [];
+  const deals = [] as any[];
   
   // Create 25 deals with varied scores
   for (let i = 1; i <= 25; i++) {
     // Create score ranges with wider variance to ensure different filtering results
-    // This creates a more diverse set of scores across the deals
     const baseScore = Math.max(30, 100 - (i * 2.8));
-    const variance = 20; // Increased variance for more diverse scores
+    const variance = 20;
     
-    // Generate scores with higher variance for better filtering demonstration
-    // Using our seeded random function instead of Math.random()
     const linkedinStrength = Math.min(98, Math.max(25, Math.round(baseScore + (random() * variance * 2 - variance))));
     const exitStrategyStrength = Math.min(98, Math.max(25, Math.round(baseScore + (random() * variance * 2 - variance))));
     const gtmStrength = Math.min(98, Math.max(25, Math.round(baseScore + (random() * variance * 2 - variance))));
     const businessModelStrength = Math.min(98, Math.max(25, Math.round(baseScore + (random() * variance * 2 - variance))));
+
+    // Compute weighted score (kept consistent with existing approximation)
+    const weightedScore =
+      linkedinStrength * SCORING_WEIGHTS.linkedinStrength +
+      exitStrategyStrength * SCORING_WEIGHTS.exitStrategyStrength +
+      gtmStrength * SCORING_WEIGHTS.gtmStrength +
+      businessModelStrength * SCORING_WEIGHTS.businessModelStrength;
+
+    const totalScore = Math.round(weightedScore);
     
-    // Calculate total score as weighted average
-    const totalScore = Math.round((linkedinStrength + exitStrategyStrength + gtmStrength + businessModelStrength) / 4);
-    
-    // Generate company name
     const industry = industries[Math.floor(random() * industries.length)];
     const prefix = companyPrefixes[Math.floor(random() * companyPrefixes.length)];
     const type = companyTypes[Math.floor(random() * companyTypes.length)];
     
-    let name, company;
+    let name: string, company: string;
     
     if (i <= 6) {
       // Keep the original 6 deals
@@ -84,40 +120,47 @@ const generateDeals = () => {
           name = 'Food Delivery Optimization';
           company = 'QuickBite';
           break;
+        default:
+          name = `${industry} Platform`;
+          company = `${prefix}${type}`;
       }
     } else {
-      // Generate new deal names for the rest
       name = `${industry} ${random() > 0.5 ? 'Platform' : 'Solution'}`;
       company = `${prefix}${random() > 0.7 ? industry : ''}${type}`;
     }
     
-    deals.push({
-      id: i,
-      name,
-      company,
+    const factors = {
       linkedinStrength,
       exitStrategyStrength,
       gtmStrength,
       businessModelStrength,
-      totalScore
+    };
+
+    const reasons = generateReasons(factors);
+
+    deals.push({
+      id: i,
+      name,
+      company,
+      ...factors,
+      totalScore,
+      reasons,
+      weights: { ...SCORING_WEIGHTS },
+      breakdown: {
+        linkedin: Math.round(factors.linkedinStrength * SCORING_WEIGHTS.linkedinStrength),
+        exit: Math.round(factors.exitStrategyStrength * SCORING_WEIGHTS.exitStrategyStrength),
+        gtm: Math.round(factors.gtmStrength * SCORING_WEIGHTS.gtmStrength),
+        businessModel: Math.round(factors.businessModelStrength * SCORING_WEIGHTS.businessModelStrength),
+      },
+      calculation: `${Math.round(factors.linkedinStrength * SCORING_WEIGHTS.linkedinStrength)} + ${Math.round(factors.exitStrategyStrength * SCORING_WEIGHTS.exitStrategyStrength)} + ${Math.round(factors.gtmStrength * SCORING_WEIGHTS.gtmStrength)} + ${Math.round(factors.businessModelStrength * SCORING_WEIGHTS.businessModelStrength)} = ${totalScore}`,
     });
   }
   
-  // Sort by total score to ensure highest scores are at the top
   return deals.sort((a, b) => b.totalScore - a.totalScore);
 };
 
 // Generate deals once to avoid hydration mismatch
 const DEALS = generateDeals();
-
-// Pre-calculate animation values to avoid hydration mismatches
-const ANIMATION_VALUES = [
-  { top: '15%', left: '20%', animationDelay: '0.2s', animationDuration: '1.5s' },
-  { top: '35%', left: '65%', animationDelay: '0.5s', animationDuration: '1.8s' },
-  { top: '10%', left: '75%', animationDelay: '0.8s', animationDuration: '2.1s' },
-  { top: '40%', left: '30%', animationDelay: '1.1s', animationDuration: '1.7s' },
-  { top: '25%', left: '45%', animationDelay: '1.4s', animationDuration: '1.9s' }
-];
 
 export default function Filter() {
   const [filters, setFilters] = useState({
@@ -130,6 +173,7 @@ export default function Filter() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedDeal, setSelectedDeal] = useState<any | null>(null);
   const dealsPerPage = 5; // Changed from 10 to 5 deals per page
 
   // Animation effect on load
@@ -171,6 +215,7 @@ export default function Filter() {
   return (
     <section id="filter" className="py-20 bg-[var(--background)]">
       <div className="container mx-auto px-4">
+        {/* Header */}
         <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Deal <span className="gradient-text">Filtering</span></h2>
           <p className="text-[var(--foreground)]/70 max-w-2xl mx-auto">
@@ -180,28 +225,6 @@ export default function Filter() {
 
         {/* Pipeline Visualization */}
         <div className="relative mb-16">
-          {/* Animated deal influx visualization */}
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full">
-            <div className="relative w-64 h-32">
-              {ANIMATION_VALUES.map((values, i) => (
-                <div 
-                  key={i} 
-                  className="absolute w-12 h-12 rounded-lg bg-[var(--card)] border border-[var(--border)] shadow-lg transform rotate-45 opacity-80 animate-fall"
-                  style={{
-                    top: values.top,
-                    left: values.left,
-                    animationDelay: values.animationDelay,
-                    animationDuration: values.animationDuration,
-                  }}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center transform -rotate-45">
-                    <span className="text-xs font-bold">Deal</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Filter Controls */}
           <div className={`bg-[var(--card)] rounded-lg border border-[var(--border)] p-6 mb-8 shadow-lg transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`} style={{transitionDelay: '200ms'}}>
             <h3 className="text-xl font-semibold mb-4">Filter Deals by Strength</h3>
@@ -409,7 +432,7 @@ export default function Filter() {
                                 {deal.totalScore}%
                               </div>
                             </div>
-                            <button className="btn-secondary text-sm py-1 px-3">Details</button>
+                            <button onClick={() => setSelectedDeal(deal)} className="btn-secondary text-sm py-1 px-3">Details</button>
                           </div>
                         </div>
                       </div>
@@ -462,6 +485,81 @@ export default function Filter() {
           </div>
         </div>
       </div>
+
+      {/* Details Modal */}
+      {selectedDeal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setSelectedDeal(null)}>
+          <div className="w-full max-w-3xl bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-[var(--border)] flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-bold">{selectedDeal.name}</h3>
+                <p className="text-sm text-[var(--foreground)]/70">{selectedDeal.company}</p>
+              </div>
+              <button onClick={() => setSelectedDeal(null)} className="text-[var(--muted)] hover:text-[var(--foreground)]">✕</button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Weights */}
+              <div className="bg-[var(--background)] rounded-xl border border-[var(--border)] p-4">
+                <h4 className="font-semibold mb-3">Weights</h4>
+                <ul className="text-sm space-y-2">
+                  <li className="flex justify-between"><span>LinkedIn</span><span>{Math.round(selectedDeal.weights.linkedinStrength * 100)}%</span></li>
+                  <li className="flex justify-between"><span>Exit Strategy</span><span>{Math.round(selectedDeal.weights.exitStrategyStrength * 100)}%</span></li>
+                  <li className="flex justify-between"><span>GTM</span><span>{Math.round(selectedDeal.weights.gtmStrength * 100)}%</span></li>
+                  <li className="flex justify-between"><span>Business Model</span><span>{Math.round(selectedDeal.weights.businessModelStrength * 100)}%</span></li>
+                </ul>
+              </div>
+
+              {/* Scores */}
+              <div className="bg-[var(--background)] rounded-xl border border-[var(--border)] p-4">
+                <h4 className="font-semibold mb-3">Scores</h4>
+                <ul className="text-sm space-y-2">
+                  <li className="flex justify-between"><span>LinkedIn Strength</span><span>{selectedDeal.linkedinStrength}%</span></li>
+                  <li className="flex justify-between"><span>Exit Strategy</span><span>{selectedDeal.exitStrategyStrength}%</span></li>
+                  <li className="flex justify-between"><span>GTM</span><span>{selectedDeal.gtmStrength}%</span></li>
+                  <li className="flex justify-between"><span>Business Model</span><span>{selectedDeal.businessModelStrength}%</span></li>
+                </ul>
+              </div>
+
+              {/* Contribution */}
+              <div className="bg-[var(--background)] rounded-xl border border-[var(--border)] p-4">
+                <h4 className="font-semibold mb-3">Contributions</h4>
+                <ul className="text-sm space-y-2">
+                  <li className="flex justify-between"><span>LinkedIn</span><span>{selectedDeal.breakdown.linkedin}</span></li>
+                  <li className="flex justify-between"><span>Exit Strategy</span><span>{selectedDeal.breakdown.exit}</span></li>
+                  <li className="flex justify-between"><span>GTM</span><span>{selectedDeal.breakdown.gtm}</span></li>
+                  <li className="flex justify-between"><span>Business Model</span><span>{selectedDeal.breakdown.businessModel}</span></li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Reasons */}
+            <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[var(--background)] rounded-xl border border-[var(--border)] p-4">
+                <h4 className="font-semibold mb-3">Why this ranking</h4>
+                <ul className="text-sm space-y-2 list-disc list-inside text-[var(--foreground)]/80">
+                  <li><span className="font-medium">LinkedIn:</span> {selectedDeal.reasons.linkedinStrength}</li>
+                  <li><span className="font-medium">Exit Strategy:</span> {selectedDeal.reasons.exitStrategyStrength}</li>
+                  <li><span className="font-medium">GTM:</span> {selectedDeal.reasons.gtmStrength}</li>
+                  <li><span className="font-medium">Business Model:</span> {selectedDeal.reasons.businessModelStrength}</li>
+                </ul>
+              </div>
+              <div className="bg-[var(--background)] rounded-xl border border-[var(--border)] p-4">
+                <h4 className="font-semibold mb-3">Overall Calculation</h4>
+                <div className="text-sm">
+                  <div className="mb-2">Weighted Sum:</div>
+                  <div className="text-[var(--foreground)]/90 font-mono">{selectedDeal.calculation}</div>
+                  <div className="mt-3">Overall Score: <span className="font-semibold">{selectedDeal.totalScore}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6">
+              <button onClick={() => setSelectedDeal(null)} className="btn-primary">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 } 
